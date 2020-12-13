@@ -11,6 +11,8 @@ build/
 *.ipr
 *.iws
 .idea
+/.bsp
+.bloop
 
 # mac
 .DS_Store
