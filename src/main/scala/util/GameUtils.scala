@@ -1,0 +1,249 @@
+package util
+
+import accessories.{Card, CardDeck, Player}
+import action.Move
+import cats.effect.IO
+import characteristics.{CardPosition, NumberOfPlayers}
+import displayObjects.{GameState, HintTokens}
+import errors.HanabiErrors
+import errors.HanabiErrors._
+
+import scala.annotation.tailrec
+
+object GameUtils {
+
+  def askNumberOfPlayers: NumberOfPlayers =
+    try {
+      println(
+        s"How many number of players?"
+      ) // TODO: side effect, not referential transparency.
+      NumberOfPlayers.parse(scala.io.StdIn.readInt()) match {
+        case Left(err) =>
+          println(err)
+          askNumberOfPlayers
+        case Right(numberOfPlayers) => numberOfPlayers
+      }
+    } catch {
+      case _: Throwable =>
+        println(ReadIntErrors())
+        askNumberOfPlayers
+    }
+
+  def askPlayerNames(
+      num: NumberOfPlayers
+  ): Vector[String] = {
+    num match {
+      case NumberOfPlayers.Two => Vector(askPlayerName, askPlayerName)
+      case NumberOfPlayers.Three =>
+        Vector(askPlayerName, askPlayerName, askPlayerName)
+      case NumberOfPlayers.Four =>
+        Vector(askPlayerName, askPlayerName, askPlayerName, askPlayerName)
+      case NumberOfPlayers.Five =>
+        Vector(
+          askPlayerName,
+          askPlayerName,
+          askPlayerName,
+          askPlayerName,
+          askPlayerName
+        )
+    }
+  }
+
+  @tailrec
+  private def askPlayerName: String =
+    try {
+      println(s"What is the name of the player?")
+      scala.io.StdIn.readLine()
+    } catch {
+      case _: Throwable =>
+        println(ReadStringErrors())
+        askPlayerName
+    }
+
+  def askPlayerMove(
+      player: Player,
+      hintTokens: HintTokens,
+      choice: => Char
+  ): Move = {
+    if (hintTokens.count > 0) {
+      try {
+        println(
+          s"""${player.name}, make a choice: (h)hint, (p)play, (d)discard""".stripMargin
+        )
+        Move.parse(choice) match {
+          case Left(err) =>
+            println(err)
+            askPlayerMove(player, hintTokens, choice)
+          case Right(move) => move
+        }
+      } catch {
+        case _: Throwable =>
+          println(ReadCharErrors())
+          askPlayerMove(player, hintTokens, choice)
+      }
+    } else {
+      try {
+        println(
+          s"""${player.name}, make a choice: (p)play, (d)discard""".stripMargin
+        )
+        Move.parseNoHint(choice) match {
+          case Left(err) =>
+            println(err)
+            askPlayerMove(player, hintTokens, choice)
+          case Right(move) => move
+        }
+      } catch {
+        case _: Throwable =>
+          println(ReadCharErrors())
+          askPlayerMove(player, hintTokens, choice)
+      }
+    }
+  }
+
+  def whichPlayerToHint(gameState: GameState, hintGiver: Player): Player = {
+    val otherPlayers = gameState.players.filterNot(_ == hintGiver)
+    val playerOptionsToString: String =
+      otherPlayers.map(p => s"${p.id})${p.name} ").foldLeft("")(_ + _)
+
+    def validateGivenPlayerId(
+        chosenPlayerNum: Int
+    ): Either[HanabiErrors, Player] =
+      Either.cond(
+        otherPlayers.map(_.id).contains(chosenPlayerNum),
+        otherPlayers.filter(_.id == chosenPlayerNum).head,
+        InvalidPlayerID(chosenPlayerNum)
+      )
+
+    try {
+      println(s"""
+           |${hintGiver.name}, who do you want to hint?
+           |$playerOptionsToString
+           |""".stripMargin)
+      validateGivenPlayerId(scala.io.StdIn.readInt()) match {
+        case Left(err) =>
+          println(s"$err")
+          whichPlayerToHint(gameState, hintGiver)
+        case Right(player) => player
+      }
+    } catch {
+      case _: Throwable =>
+        println(ReadIntErrors())
+        whichPlayerToHint(gameState, hintGiver)
+    }
+  }
+
+  def whichCards(
+      multipleCardOptions: MultipleCardOptions
+  ): List[CardPosition] =
+    try {
+      multipleCardOptions.list(scala.io.StdIn.readLine()) match {
+        case Left(err) =>
+          println(err)
+          whichCards(multipleCardOptions)
+        case Right(cardPositions) => cardPositions
+      }
+    } catch {
+      case _: Throwable =>
+        println(ReadStringErrors())
+        whichCards(multipleCardOptions)
+    }
+
+  def whichCard(cardOptions: SingleCardOptions): CardPosition =
+    try {
+      cardOptions.list(scala.io.StdIn.readInt()) match {
+        case Left(err) =>
+          println(err)
+          whichCard(cardOptions)
+        case Right(cardPosition) => cardPosition
+      }
+    } catch {
+      case _: Throwable =>
+        println(ReadIntErrors())
+        whichCard(cardOptions)
+    }
+
+  def parseYesNo(char: Char): Either[HanabiErrors, Boolean] =
+    char match {
+      case 'y' => Right(true)
+      case 'n' => Right(false)
+      case _   => Left(InvalidYesNo())
+    }
+
+  /** If CardDeck is non-empty, removes the selected card from the player's hand and then adds a new card to the hand.
+    * Else, just removes the selected card from the player's hand.
+    *
+    * @param player
+    * @param cardDeck
+    * @param cardPosition
+    * @return
+    */
+  def updatePlayerHand(
+      player: Player,
+      cardDeck: CardDeck,
+      cardPosition: CardPosition
+  ): Player =
+    if (cardDeck.cards.isEmpty)
+      player.copy(hand =
+        player.hand.zipWithIndex
+          .filterNot(_._2 == cardPosition.toInt)
+          .map(_._1)
+      )
+    else
+      player.copy(hand =
+        player.hand.zipWithIndex
+          .filterNot(_._2 == cardPosition.toInt)
+          .map(_._1) :+ cardDeck.cards.head
+      )
+
+  // TODO: keep it here for now until start using Monocle
+  def updateGameStateAfterPlayMove(
+      gameState: GameState,
+      player: Player,
+      cardPosition: CardPosition
+  ): GameState = {
+    val cardPositionInt = cardPosition.toInt
+    val selectedCard: Card = player.hand(cardPositionInt)
+    if (gameState.lobby.isCorrectCard(selectedCard)) {
+      gameState.copy(
+        players = gameState.players.updated(
+          player.id,
+          updatePlayerHand(player, gameState.cardDeck, cardPosition)
+        ),
+        cardDeck = gameState.cardDeck.copy(gameState.cardDeck.cards.drop(1)),
+        lobby = gameState.lobby.copy(gameState.lobby.add(selectedCard).showroom)
+      )
+    } else {
+      gameState.copy(
+        players = gameState.players.updated(
+          player.id,
+          updatePlayerHand(player, gameState.cardDeck, cardPosition)
+        ),
+        cardDeck = gameState.cardDeck.copy(gameState.cardDeck.cards.drop(1)),
+        discardPile = gameState.discardPile
+          .copy(gameState.discardPile.discard(selectedCard).showroom),
+        life = gameState.life.copy(count = gameState.life.lose.count)
+      )
+    }
+  }
+
+  // TODO: keep it here for now until start using Monocle
+  def updateCardDeckState(
+      cardDeck: CardDeck,
+      numOfCards: Option[Int]
+  ): CardDeck =
+    numOfCards.fold(cardDeck)(num =>
+      cardDeck.copy(cards = cardDeck.cards.drop(num))
+    )
+
+  // TODO: keep it here for now until start using IO
+  private def printLine(msg: String): IO[Unit] =
+    IO {
+      println(msg)
+    }
+
+  // TODO: keep it here for now until start using IO
+  private def askStringInput: IO[String] =
+    IO {
+      scala.io.StdIn.readLine()
+    }
+}

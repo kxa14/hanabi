@@ -1,18 +1,20 @@
-import CardDeck.generateDeck
-import NumberOfPlayers.{Five, Four, Three, Two, deParse}
-// 55 cards => a deck for each game, shuffle randomly
-// 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5
+package accessories
 
-final case class CardDeck(cards: Vector[Card]) {
+import characteristics.Colours
 
-  def deal(numOfCards: Int): Vector[Card] = this.cards.take(numOfCards)
-
-}
+final case class CardDeck(cards: Vector[Card])
 
 object CardDeck {
 
   def apply(): CardDeck = generateDeck
 
+  /**
+    * Generates a card deck with the following criteria:
+    * 50 fireworks cards in five colors (red, yellow, white, green, blue)
+    * 10 cards per color with the values 1, 1, 1, 2, 2, 3, 3, 4, 4, 5
+    *
+    * @return
+    */
   private def generateDeck: CardDeck = {
     val deck =
       Vector(1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5).flatMap(c =>
@@ -30,6 +32,6 @@ object CardDeck {
         )
       )
     val shuffledDeck = scala.util.Random.shuffle(deck)
-    new CardDeck(shuffledDeck)
+    CardDeck(shuffledDeck)
   }
 }
