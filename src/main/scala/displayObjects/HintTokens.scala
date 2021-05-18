@@ -6,5 +6,10 @@ final case class HintTokens(count: Int) {
 }
 
 object HintTokens {
+
+  /**
+    * According to rule, each game begins with 8 tokens.
+    * @return
+    */
   def apply(): HintTokens = HintTokens(8)
 }

@@ -5,6 +5,7 @@ import characteristics.NumberOfPlayers.{Five, Four, Three, Two}
 import characteristics.{CardPosition, NumberOfPlayers}
 import util.GameUtils
 import util.GameUtils.{askNumberOfPlayers, askPlayerMove, askPlayerNames}
+import monocle.macros.syntax.lens._
 
 final case class GameState(
     players: Vector[Player],
@@ -36,8 +37,9 @@ final case class GameState(
     val playersToDisplay = players.filterNot(_ == currentPlayer)
     s"""
        |                            -------------------
-       |    --------------          | Life = ${life.count}
-       |    |   Lobby    |          | Hint tokens = ${hintTokens.count}
+       |                            | Life = ${life.count}
+       |    --------------          | Hint tokens = ${hintTokens.count}
+       |    |   Lobby    |          | Number of CardDeck = ${cardDeck.cards.size}
        |    --------------          -------------------
        |${lobby.showroom.mkString("\n")}
        |
@@ -74,28 +76,18 @@ final case class GameState(
       player: Player,
       cardPosition: CardPosition
   ): GameState = {
-    val cardPositionInt = cardPosition.toInt
-    val selectedCard: Card = player.hand(cardPositionInt)
-    if (lobby.isCorrectCard(selectedCard)) {
-      this.copy(
-        players = players.updated(
-          player.id,
-          GameUtils.updatePlayerHand(player, cardDeck, cardPosition)
-        ),
-        cardDeck = cardDeck.copy(cardDeck.cards.drop(1)),
-        lobby = lobby.copy(lobby.add(selectedCard).showroom)
-      )
+    val selectedCard: Card = player.hand(cardPosition.toInt)
+    val updatedPlayerAndCardDeck: GameState =
+      GameUtils.updatePlayerAndCardDeck(this, player, cardPosition)
+
+    if (updatedPlayerAndCardDeck.lobby.isCorrectCard(selectedCard)) {
+      updatedPlayerAndCardDeck.lens(_.lobby).modify(_.add(selectedCard))
     } else {
-      this.copy(
-        players = players.updated(
-          player.id,
-          GameUtils.updatePlayerHand(player, cardDeck, cardPosition)
-        ),
-        cardDeck = cardDeck.copy(cardDeck.cards.drop(1)),
-        discardPile =
-          discardPile.copy(discardPile.discard(selectedCard).showroom),
-        life = life.copy(count = life.lose.count)
-      )
+      updatedPlayerAndCardDeck
+        .lens(_.discardPile)
+        .modify(_.discard(selectedCard))
+        .lens(_.life.count)
+        .modify(_ - 1)
     }
   }
 
@@ -110,18 +102,13 @@ final case class GameState(
       player: Player,
       cardPosition: CardPosition
   ): GameState = {
-    val cardPositionInt = cardPosition.toInt
-    val selectedCard: Card = player.hand(cardPositionInt)
-    this.copy(
-      players = players.updated(
-        player.id,
-        GameUtils.updatePlayerHand(player, cardDeck, cardPosition)
-      ),
-      cardDeck = cardDeck.copy(cardDeck.cards.drop(1)),
-      discardPile =
-        discardPile.copy(discardPile.discard(selectedCard).showroom),
-      hintTokens = hintTokens.gain
-    )
+    val selectedCard: Card = player.hand(cardPosition.toInt)
+    GameUtils
+      .updatePlayerAndCardDeck(this, player, cardPosition)
+      .lens(_.discardPile)
+      .modify(_.discard(selectedCard))
+      .lens(_.hintTokens)
+      .modify(_.gain)
   }
 
   private def dealCardsToPlayer(playerID: Int, numOfCards: Int): GameState = {

@@ -42,5 +42,5 @@ object MultipleCardOptions {
   }
 
   def parse(players: Vector[Player]): MultipleCardOptions =
-    if (players.size >= 3) MoreThanThreePlayers() else LessThanFourPlayers()
+    if (players.size > 3) MoreThanThreePlayers() else LessThanFourPlayers()
 }

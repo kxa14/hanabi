@@ -1,12 +1,13 @@
 package util
 
-import accessories.{Card, CardDeck, Player}
+import accessories.{CardDeck, Player}
 import action.Move
 import cats.effect.IO
 import characteristics.{CardPosition, NumberOfPlayers}
 import displayObjects.{GameState, HintTokens}
 import errors.HanabiErrors
 import errors.HanabiErrors._
+import monocle.macros.syntax.lens._
 
 import scala.annotation.tailrec
 
@@ -169,8 +170,31 @@ object GameUtils {
       case _   => Left(InvalidYesNo())
     }
 
-  /** If CardDeck is non-empty, removes the selected card from the player's hand and then adds a new card to the hand.
-    * Else, just removes the selected card from the player's hand.
+  /** For both Play's and Discard's move, each player's hand will need to be updated (dropping and/or adding one card) and
+    * CardDeck will need to drop the first card if there is any.
+    *
+    * @param gameState
+    * @param player
+    * @param cardPosition
+    * @return
+    */
+  def updatePlayerAndCardDeck(
+      gameState: GameState,
+      player: Player,
+      cardPosition: CardPosition
+  ): GameState =
+    gameState
+      .lens(_.players)
+      .modify(
+        _.updated(
+          player.id,
+          GameUtils.updatePlayerHand(player, gameState.cardDeck, cardPosition)
+        )
+      )
+      .lens(_.cardDeck.cards)
+      .modify(_.drop(1))
+
+  /** Drops the selected card, then, only if there is still card in the CardDeck, adds one card into the player's hand.
     *
     * @param player
     * @param cardDeck
@@ -181,59 +205,18 @@ object GameUtils {
       player: Player,
       cardDeck: CardDeck,
       cardPosition: CardPosition
-  ): Player =
-    if (cardDeck.cards.isEmpty)
-      player.copy(hand =
-        player.hand.zipWithIndex
+  ): Player = {
+    val playerWithOneCardLess = player
+      .lens(_.hand)
+      .modify(
+        _.zipWithIndex
           .filterNot(_._2 == cardPosition.toInt)
           .map(_._1)
       )
-    else
-      player.copy(hand =
-        player.hand.zipWithIndex
-          .filterNot(_._2 == cardPosition.toInt)
-          .map(_._1) :+ cardDeck.cards.head
-      )
-
-  // TODO: keep it here for now until start using Monocle
-  def updateGameStateAfterPlayMove(
-      gameState: GameState,
-      player: Player,
-      cardPosition: CardPosition
-  ): GameState = {
-    val cardPositionInt = cardPosition.toInt
-    val selectedCard: Card = player.hand(cardPositionInt)
-    if (gameState.lobby.isCorrectCard(selectedCard)) {
-      gameState.copy(
-        players = gameState.players.updated(
-          player.id,
-          updatePlayerHand(player, gameState.cardDeck, cardPosition)
-        ),
-        cardDeck = gameState.cardDeck.copy(gameState.cardDeck.cards.drop(1)),
-        lobby = gameState.lobby.copy(gameState.lobby.add(selectedCard).showroom)
-      )
-    } else {
-      gameState.copy(
-        players = gameState.players.updated(
-          player.id,
-          updatePlayerHand(player, gameState.cardDeck, cardPosition)
-        ),
-        cardDeck = gameState.cardDeck.copy(gameState.cardDeck.cards.drop(1)),
-        discardPile = gameState.discardPile
-          .copy(gameState.discardPile.discard(selectedCard).showroom),
-        life = gameState.life.copy(count = gameState.life.lose.count)
-      )
-    }
+    cardDeck.cards.headOption
+      .map(card => playerWithOneCardLess.lens(_.hand).modify(_ :+ card))
+      .getOrElse(playerWithOneCardLess)
   }
-
-  // TODO: keep it here for now until start using Monocle
-  def updateCardDeckState(
-      cardDeck: CardDeck,
-      numOfCards: Option[Int]
-  ): CardDeck =
-    numOfCards.fold(cardDeck)(num =>
-      cardDeck.copy(cards = cardDeck.cards.drop(num))
-    )
 
   // TODO: keep it here for now until start using IO
   private def printLine(msg: String): IO[Unit] =
