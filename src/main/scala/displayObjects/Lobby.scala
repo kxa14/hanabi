@@ -8,9 +8,9 @@ final case class Lobby(showroom: Map[Colours, Vector[Int]]) {
 
   def add(card: Card): Lobby = {
     println(s""" 
-         |+ $card has been added to the lobby. 
-         |+------------------------------------+
-         |""".stripMargin)
+               |+ $card has been added to the lobby. 
+               |+------------------------------------+
+               |""".stripMargin)
     this.copy(showroom =
       showroom.updated(card.colour, showroom(card.colour) :+ card.num)
     )
@@ -59,5 +59,4 @@ object Lobby {
         White -> Vector[Int]()
       )
     )
-
 }

@@ -17,7 +17,7 @@ object CardDeck {
     */
   private def generateDeck: CardDeck = {
     val deck =
-      Vector(1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5).flatMap(c =>
+      Vector(1, 1, 1, 2, 2, 3, 3, 4, 4, 5).flatMap(c =>
         Vector(
           Colours.Red,
           Colours.Yellow,
