@@ -126,8 +126,8 @@ object ConsoleIORequest {
                  |""".stripMargin)(new StdIntHanabiConsole[IO]))
   }.map(Number.parse)
 
-  def requestSingleCardPosition(player: Player): IO[Int] = {
-    val availableCardsCount = player.hand.size
+  def requestSingleCardPosition(hintReceiver: Player): IO[Int] = {
+    val availableCardsCount = hintReceiver.hand.size
     val cardMsg = Map(
       1 -> "(1)First",
       2 -> "(1)First (2)Second",
@@ -165,7 +165,6 @@ object ConsoleIORequest {
 
     def isCardPositionValid(num: Int): Boolean =
       num > 0 && num <= availableCardsCount
-
     def wasSuccessful(cardNums: String): IO[Boolean] =
       IO {
         cardNums
@@ -173,12 +172,12 @@ object ConsoleIORequest {
           .split(",")
           .toList
           .toNel
-          .map(numsString =>
+          .exists(numsString => {
             numsString
-              .map(numString => numString.toIntOption)
-              .map(i => i.exists(isCardPositionValid))
-          )
-          .exists(x => if (x.exists(_ == false)) false else true)
+              .map(_.toIntOption.exists(isCardPositionValid))
+              .find(_ == false)
+              .getOrElse(true)
+          })
       }
 
     retryingOnFailuresAndAllErrors(
@@ -197,10 +196,11 @@ object ConsoleIORequest {
       _.filterNot(_.isWhitespace)
         .split(",")
         .toList
-        .flatMap(_.map(_.toInt).distinct.sorted)
+        .map(_.toInt)
+        .distinct
+        .sorted
     ) // can use .toInt directly because check has already been done earlier in wasSuccessful(cardNums: String) method.
-  }.map(_.map(_ - 1))
-    .map(_.map(CardPosition.parse)) // TODO: Bug, investigating...
+  }.map(i => i.map(x => CardPosition.parse(x - 1)))
 
   def requestWhichPlayerToHint(
       gameState: GameState,

@@ -26,25 +26,22 @@ object HintMoveExecutor {
       requestSingleCardPosition: RequestSingleCardPosition[F],
       requestMultipleCardPositions: RequestMultipleCardPositions[F]
   ) extends HintMoveExecutor[F] {
-    def execute(gameState: GameState, player: Player): F[GameState] =
+    def execute(gameState: GameState, hintGiver: Player): F[GameState] =
       for {
-        hintReceiver <- requestWhoToHint.run(gameState, player)
+        hintReceiver <- requestWhoToHint.run(gameState, hintGiver)
         clue <- requestClue.run
         guess <- parseClue(clue)
         isMoreThanOneCard <- requestIsMoreThanOneCard.run(clue)
         gs <-
           if (isMoreThanOneCard) for {
-            cardIndexes <- requestMultipleCardPositions.run(player)
-//            cardPositions <- Sync[F].delay(
-//              cardIndexes.map(x => CardPosition.parse(x))
-//            ) // TODO: Bug, WIP: not sure why...
+            cardIndexes <- requestMultipleCardPositions.run(hintReceiver)
             afterHintGS <-
               Sync[F].delay(gameState.lens(_.hintTokens).modify(_.lose))
             _ <- Sync[F].delay {
               println(
                 msg(
                   hintReceiver,
-                  player,
+                  hintGiver,
                   afterHintGS,
                   multipleCardPositionMsg(cardIndexes, guess)
                 )
@@ -53,7 +50,7 @@ object HintMoveExecutor {
           } yield afterHintGS
           else {
             for {
-              cardIndex <- requestSingleCardPosition.run(player)
+              cardIndex <- requestSingleCardPosition.run(hintGiver)
               cardPosition <- Sync[F].delay(CardPosition.parse(cardIndex))
               afterHintGS <-
                 Sync[F].delay(gameState.lens(_.hintTokens).modify(_.lose))
@@ -63,7 +60,7 @@ object HintMoveExecutor {
                     println(
                       msg(
                         hintReceiver,
-                        player,
+                        hintGiver,
                         afterHintGS,
                         singleCardPositionMsg(cardPosition, guess)
                       )
