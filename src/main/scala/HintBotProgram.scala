@@ -1,6 +1,6 @@
 import accessories.Player
 import cats.effect.{ExitCode, IO, IOApp}
-import displayObjects.GameState
+import displayObjects.{GameState, HintTokens, Life}
 import hanabi.ConsoleIORequest._
 import hanabi.DiscardMoveExecutor.LivePlayersDiscardMoveExecutor
 import hanabi.Generator._
@@ -8,22 +8,37 @@ import hanabi.HintMoveExecutor.LivePlayersHintMoveExecutor
 import hanabi.PlayMoveExecutor.LivePlayersPlayMoveExecutor
 import hanabi.Request._
 import hanabi.{GameStateInitialization, OnePlayerGameLoop}
+import setup.{NumberOfPlayers, PlayersNames}
 
-object HanabiProgram extends IOApp {
+object HintBotProgram extends IOApp {
+  private val playerNumbers = new NumberOfPlayers[IO] {
+    override def run: IO[Int] = IO(2)
+  }
 
-  private val livePlayersGameStateInitialization: GameStateInitialization[IO] =
-    new GameStateInitialization[IO](
-      new RequestNumberOfPlayersImpl[IO](requestNumberOfPlayerProgram),
-      new RequestPlayerNamesImpl[IO](requestPlayerNames),
-      new PlayerGenerator[IO],
-      new InitialCardCount[IO],
-      new BasicCardDeckGen[IO],
-      new BasicLobbyGen[IO],
-      new BasicDiscardPileGen[IO],
-      new BasicLifeGen[IO],
-      new BasicHintTokensGen[IO]
-    )
+  private val playersNames = new PlayersNames[IO] {
+    override def run(numOfPlayers: Int): IO[Vector[String]] =
+      IO(Vector("Joyful:)", "Brave:)"))
+  }
 
+  private val infiniteLifeTokens = new LifeGen[IO] {
+    override def generate: IO[Life] = IO(Life(-99))
+  }
+
+  private val infiniteHintTokens = new HintTokensGen[IO] {
+    override def generate: IO[HintTokens] = IO(HintTokens(-99))
+  }
+
+  private val hintBotGameStateInitialization = new GameStateInitialization[IO](
+    playerNumbers,
+    playersNames,
+    new PlayerGenerator[IO],
+    new InitialCardCount[IO],
+    new BasicCardDeckGen[IO],
+    new BasicLobbyGen[IO],
+    new BasicDiscardPileGen[IO],
+    infiniteLifeTokens,
+    infiniteHintTokens
+  )
   private val hintMoveExecutor: LivePlayersHintMoveExecutor[IO] =
     new LivePlayersHintMoveExecutor[IO](
       new RequestWhoToHintImpl[IO](requestWhichPlayerToHint),
@@ -73,7 +88,7 @@ object HanabiProgram extends IOApp {
   }
 
   private val loop = for {
-    initialGS <- livePlayersGameStateInitialization.generate
+    initialGS <- hintBotGameStateInitialization.generate
     allPlayers <- IO(initialGS.players)
     gs <- allPlayers.foldLeft(IO(initialGS))((currentGS, currentPlayer) =>
       currentGS.flatMap(onePlayerGameLoop.start(_, currentPlayer))
@@ -81,7 +96,5 @@ object HanabiProgram extends IOApp {
     _ <- repeatCycle(IO(gs), allPlayers)
   } yield ExitCode.Success
 
-  override def run(args: List[String]): IO[ExitCode] = {
-    loop
-  }
+  override def run(args: List[String]): IO[ExitCode] = loop
 }

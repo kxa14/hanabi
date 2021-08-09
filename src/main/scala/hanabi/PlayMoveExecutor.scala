@@ -48,8 +48,8 @@ object PlayMoveExecutor {
               gsAfterUpdatingPlayerAndCardDeck
                 .lens(_.discardPile)
                 .modify(_.discard(selectedCard))
-                .lens(_.life.count)
-                .modify(_ - 1)
+                .lens(_.life)
+                .modify(_.lose)
           })
       }
     }

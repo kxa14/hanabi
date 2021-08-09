@@ -2,7 +2,7 @@ name := "hanabi"
 
 version := "0.1"
 
-scalaVersion := "2.13.1"
+scalaVersion := "2.13.6"
 
 //scalacOptions += "-Ypartial-unification"
 addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")

@@ -11,16 +11,3 @@ final case class DiscardPile(showroom: Map[Colours, Vector[Int]]) {
       showroom.updated(card.colour, showroom(card.colour) :+ card.num)
     )
 }
-
-object DiscardPile {
-  def apply(): DiscardPile =
-    DiscardPile(
-      Map(
-        Red -> Vector[Int](),
-        Yellow -> Vector[Int](),
-        Green -> Vector[Int](),
-        Blue -> Vector[Int](),
-        White -> Vector[Int]()
-      )
-    )
-}

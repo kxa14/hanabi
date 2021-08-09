@@ -47,16 +47,3 @@ final case class Lobby(showroom: Map[Colours, Vector[Int]]) {
     }
   }
 }
-
-object Lobby {
-  def apply(): Lobby =
-    Lobby(
-      Map(
-        Red -> Vector[Int](),
-        Yellow -> Vector[Int](),
-        Green -> Vector[Int](),
-        Blue -> Vector[Int](),
-        White -> Vector[Int]()
-      )
-    )
-}

@@ -4,21 +4,16 @@ import accessories.Player
 import action.Move
 import characteristics.{CardPosition, Clue}
 import displayObjects.{GameState, HintTokens}
+import setup.{NumberOfPlayers, PlayersNames}
 
 object Request {
-  sealed trait RequestNumberOfPlayers[F[_]] {
-    def run: F[Int]
-  }
   final class RequestNumberOfPlayersImpl[F[_]](nums: => F[Int])
-      extends RequestNumberOfPlayers[F] {
+      extends NumberOfPlayers[F] {
     override def run: F[Int] = nums
   }
 
-  sealed trait RequestPlayerNames[F[_]] {
-    def run(numOfPlayers: Int): F[Vector[String]]
-  }
   final class RequestPlayerNamesImpl[F[_]](names: => Int => F[Vector[String]])
-      extends RequestPlayerNames[F] {
+      extends PlayersNames[F] {
     override def run(numOfPlayers: Int): F[Vector[String]] = names(numOfPlayers)
   }
 
