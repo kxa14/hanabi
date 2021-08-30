@@ -1,6 +1,8 @@
 package displayObjects
 
 import accessories.{CardDeck, Player}
+import cats.effect.kernel.Sync
+import hanabi.OnePlayerGameLoop
 
 final case class GameState(
     players: Vector[Player],
@@ -10,6 +12,14 @@ final case class GameState(
     life: Life,
     hintTokens: HintTokens
 ) {
+  def cycle[F[_]](implicit
+      onePlayerGameLoop: OnePlayerGameLoop[F],
+      sync: Sync[F]
+  ): F[GameState] =
+    players.foldLeft(sync.pure(this))((gs, player) =>
+      onePlayerGameLoop.start(gs, player)
+    )
+
   def dealCardsToPlayer(playerID: Int, numOfCards: Int): GameState = {
     this.copy(
       players = players.updated(
