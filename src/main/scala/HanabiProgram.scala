@@ -1,4 +1,3 @@
-import accessories.Player
 import cats.effect.{ExitCode, IO, IOApp}
 import displayObjects.GameState
 import hanabi.ConsoleIORequest._
@@ -9,9 +8,12 @@ import hanabi.PlayMoveExecutor.LivePlayersPlayMoveExecutor
 import hanabi.Request._
 import hanabi.{GameStateInitialization, OnePlayerGameLoop}
 
+/**
+  * Hanabi game for live players without computer bot.
+  */
 object HanabiProgram extends IOApp {
 
-  private val livePlayersGameStateInitialization: GameStateInitialization[IO] =
+  private val gameSetup: GameStateInitialization[IO] =
     new GameStateInitialization[IO](
       new RequestNumberOfPlayersImpl[IO](requestNumberOfPlayerProgram),
       new RequestPlayerNamesImpl[IO](requestPlayerNames),
@@ -52,36 +54,16 @@ object HanabiProgram extends IOApp {
   )
 
   private def repeatCycle(
-      gameState: IO[GameState],
-      players: Vector[Player]
-  ): IO[GameState] = {
-    def loopAllPlayers(gameState: IO[GameState]): IO[GameState] = {
-      players.foldLeft(gameState)((currentGS, currentPlayer) =>
-        currentGS.flatMap(onePlayerGameLoop.start(_, currentPlayer))
-      )
-    }
-
+      gameState: IO[GameState]
+  )(implicit onePlayerGameLoop: OnePlayerGameLoop[IO]): IO[GameState] = {
     gameState.flatMap(gs =>
-      if (
-        gs.life.count == 0
-      ) // TODO: Need to add two more another ending conditions when i) the players complete all five fireworks correctly. ii) a player draws the last card from the draw deck
-        IO.println("Game Over! Hope you all had fun :)") *> IO(
-          gs
-        )
-      else repeatCycle(loopAllPlayers(gameState), players)
+      if (gs.life.count == 0)
+        IO.println("Game Over! Hope you all had fun :)") *> IO(gs)
+      else repeatCycle(gs.cycle)
     )
   }
 
-  private val loop = for {
-    initialGS <- livePlayersGameStateInitialization.generate
-    allPlayers <- IO(initialGS.players)
-    gs <- allPlayers.foldLeft(IO(initialGS))((currentGS, currentPlayer) =>
-      currentGS.flatMap(onePlayerGameLoop.start(_, currentPlayer))
-    )
-    _ <- repeatCycle(IO(gs), allPlayers)
-  } yield ExitCode.Success
-
   override def run(args: List[String]): IO[ExitCode] = {
-    loop
+    repeatCycle(gameSetup.generate)(onePlayerGameLoop) *> IO(ExitCode.Success)
   }
 }

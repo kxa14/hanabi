@@ -7,12 +7,27 @@ import displayObjects.GameState
 import hanabi.Generator._
 import setup.{NumberOfPlayers, PlayersNames}
 
-//sealed trait GameStateInitialization[F[_]] {
-//  def generate: F[GameState]
-//}
+/** Kick starts the game by initializing the game state.
+  * Makes it concrete because the steps of initializing the game are the same
+  * regardless the player is real human being or a computer bot.
+  * Just needs to plug in a different implementations of getting player headcount and names.
+  *
+  * @param numberOfPlayers
+  * @param playerNames
+  * @param playerGenerator
+  * @param initialCardCount
+  * @param cardDeckGen
+  * @param lobbyGen
+  * @param discardPileGen
+  * @param lifeGen
+  * @param hintTokensGen
+  * @param monad$F$0
+  * @param sync$F$1
+  * @tparam F
+  */
 final class GameStateInitialization[F[_]: Monad: Sync](
-    numberOfPlayersRequest: NumberOfPlayers[F],
-    requestPlayerNames: PlayersNames[F],
+    numberOfPlayers: NumberOfPlayers[F],
+    playerNames: PlayersNames[F],
     playerGenerator: PlayerGenerator[F],
     initialCardCount: InitialCardCount[F],
     cardDeckGen: CardDeckGen[F],
@@ -23,8 +38,8 @@ final class GameStateInitialization[F[_]: Monad: Sync](
 ) {
   def generate: F[GameState] =
     for {
-      numOfPlayers <- numberOfPlayersRequest.run
-      names <- requestPlayerNames.run(numOfPlayers)
+      numOfPlayers <- numberOfPlayers.run
+      names <- playerNames.run(numOfPlayers)
       players <- playerGenerator.generate(names)
       _ <- Sync[F].delay(println("Initializing Hanabi game state...\n"))
       cardNum <- initialCardCount.count(numOfPlayers)
